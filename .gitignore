@@ -1,0 +1,9 @@
+node_modules/
+dist/
+web-ext-artifacts/
+.env
+.DS_Store
+*.log
+__pycache__/
+# Старый установщик моста писал сюда ключ; в репозиторий он попадать не должен.
+calendar-bridge-config.js

@@ -1,0 +1,26 @@
+{
+  "name": "zen-home",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Personal start page for Zen Browser as a Firefox extension: clock, Essentials and Apple Calendar events.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mrkvqv/zen-home.git"
+  },
+  "type": "module",
+  "scripts": {
+    "start": "web-ext run --firefox=/Applications/Zen.app/Contents/MacOS/zen",
+    "lint": "web-ext lint",
+    "build": "web-ext build --overwrite-dest",
+    "sign": "node --env-file=.env scripts/sign.js",
+    "bridge-key": "node scripts/token.js",
+    "format": "prettier --write .",
+    "bridge:install": "python3 bridge/install.py",
+    "bridge:test": "python3 bridge/test_service.py"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "web-ext": "^8.3.0"
+  }
+}
