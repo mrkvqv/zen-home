@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="referrer" content="no-referrer" />
+    <title>mrkvqv · Home</title>
+    <link rel="preload" href="assets/fonts/JetBrainsMono.woff" as="font" type="font/woff" crossorigin />
+    <link rel="stylesheet" href="home.css" />
+    <script type="module" src="js/home.js"></script>
+  </head>
+  <body>
+    <main class="scene" aria-label="Стартовая страница">
+      <div class="scene-inner">
+        <div class="identity">mrkvqv</div>
+        <div class="hero">
+          <time class="clock" data-clock>--:--</time>
+          <time class="date" data-date></time>
+        </div>
+
+        <div class="layout">
+          <nav class="bookmarks" data-bookmarks aria-label="Закреплённые вкладки Zen"></nav>
+
+          <section class="calendar" aria-label="Календарь">
+            <header class="month-heading">
+              <h3 class="month-label" data-month-label aria-live="polite" aria-atomic="true"></h3>
+              <div class="month-controls">
+                <button
+                  class="nav-button"
+                  type="button"
+                  data-step-month="-1"
+                  aria-label="Предыдущий месяц"
+                  title="Предыдущий месяц"
+                ></button>
+                <button class="nav-button" type="button" data-step-month="1" aria-label="Следующий месяц" title="Следующий месяц"></button>
+              </div>
+            </header>
+            <table class="month-grid">
+              <thead>
+                <tr>
+                  <th scope="col" aria-label="Понедельник">пн</th>
+                  <th scope="col" aria-label="Вторник">вт</th>
+                  <th scope="col" aria-label="Среда">ср</th>
+                  <th scope="col" aria-label="Четверг">чт</th>
+                  <th scope="col" aria-label="Пятница">пт</th>
+                  <th scope="col" aria-label="Суббота">сб</th>
+                  <th scope="col" aria-label="Воскресенье">вс</th>
+                </tr>
+              </thead>
+              <tbody data-days></tbody>
+            </table>
+            <div class="selection">
+              <button class="nav-button" type="button" data-step-day="-1" aria-label="Предыдущий день" title="Предыдущий день"></button>
+              <time class="selected-date" data-selected-date aria-live="polite" aria-atomic="true"></time>
+              <button class="nav-button" type="button" data-step-day="1" aria-label="Следующий день" title="Следующий день"></button>
+            </div>
+            <div class="reset-row">
+              <button class="reset" type="button" data-today>Сегодня</button>
+            </div>
+          </section>
+        </div>
+
+        <section class="agenda" data-agenda aria-label="События календаря">
+          <header class="agenda-header">
+            <div class="agenda-title-row">
+              <h2 class="agenda-heading" data-agenda-heading></h2>
+              <span class="event-count" data-event-count></span>
+            </div>
+            <div class="sync-controls">
+              <span class="sync-status" data-sync-status role="status"></span>
+              <details class="calendar-list" data-calendar-list></details>
+              <button class="refresh-events" type="button" data-refresh-events>Обновить</button>
+            </div>
+          </header>
+          <div class="event-list-frame" data-event-frame>
+            <div class="event-list" data-event-list></div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <template data-setup>
+      <form class="setup" data-setup-form>
+        <p class="setup-text">
+          Чтобы показать Essentials и события, расширению нужен ключ локального моста календаря. Скопируй его командой
+          <code>pnpm bridge-key</code> в папке проекта и вставь сюда.
+        </p>
+        <div class="setup-row">
+          <input
+            class="setup-input"
+            name="token"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="Ключ моста"
+            aria-label="Ключ моста"
+            required
+            minlength="32"
+          />
+          <button class="refresh-events" type="submit">Сохранить</button>
+        </div>
+      </form>
+    </template>
+  </body>
+</html>
