@@ -42,6 +42,9 @@ export const downChevron = (className = '') => svg('0 0 24 24', 'm6 9 6 6 6-6', 
 /** Стрелка ↗ в углу карточки сайта. */
 export const linkArrow = () => svg('0 0 16 16', 'M4 12 12 4M4 4h8v8', '1.2', 'link-arrow');
 
+/** Галочка выбранного календаря в меню «Календари». */
+export const checkMark = () => svg('0 0 16 16', 'm3.5 8.5 3 3 6-7', '1.6', 'calendar-check');
+
 // ---------- Даты ----------
 
 const pad = (value) => String(value).padStart(2, '0');

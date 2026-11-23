@@ -928,7 +928,8 @@ button {
   display: grid;
   gap: 12px;
   width: min(300px, calc(100vw - 36px));
-  max-height: 200px;
+  /* Чтобы все календари помещались без скрытой прокрутки. */
+  max-height: min(440px, 70vh);
   margin: 0;
   padding: 15px;
   overflow-y: auto;
@@ -942,13 +943,98 @@ button {
 }
 
 .calendar-list-item {
+  min-width: 0;
+}
+
+/* Строка календаря — переключатель «показывать / скрыть». */
+.calendar-toggle {
   display: flex;
   align-items: center;
   gap: 9px;
+  width: calc(100% + 16px);
   min-width: 0;
+  margin: -5px -8px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
   color: var(--button-text);
+  font-size: inherit;
   line-height: 1.5;
+  text-align: left;
   overflow-wrap: anywhere;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+.calendar-toggle:hover {
+  background: var(--button-hover);
+}
+
+.calendar-toggle:focus-visible {
+  outline-offset: 0;
+}
+
+/* Выключенный календарь — заметно тусклее, галочки нет. */
+.calendar-toggle[aria-pressed='false'] :is(.calendar-dot, .calendar-name) {
+  opacity: 0.4;
+}
+
+.calendar-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  transition: opacity 200ms ease;
+}
+
+.calendar-check {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  color: var(--ink);
+  transition:
+    opacity 200ms ease,
+    transform 200ms var(--ease);
+}
+
+.calendar-toggle[aria-pressed='false'] .calendar-check {
+  opacity: 0;
+  transform: scale(0.6);
+}
+
+.calendar-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dot);
+  transition:
+    background-color 200ms ease,
+    box-shadow 200ms ease,
+    opacity 200ms ease;
+}
+
+/* Скрытый календарь — пустой кружок его цвета. */
+.calendar-toggle[aria-pressed='false'] .calendar-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--dot);
+}
+
+.calendar-list-footer {
+  padding-top: 10px;
+  border-top: 1px solid var(--menu-border);
+}
+
+.calendar-show-all {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--button-text);
+  font-size: inherit;
+}
+
+.calendar-show-all:hover {
+  color: var(--ink);
 }
 
 /* Первая настройка: ключ моста */

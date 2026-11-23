@@ -1,7 +1,7 @@
 // События выбранного дня, точки событий в сетке месяца и список календарей.
 
 import { bridgeGet } from './bridge.js';
-import { addDays, dateKey, downChevron, EASE, element, parseKey, reducedMotion } from './dom.js';
+import { addDays, checkMark, dateKey, downChevron, EASE, element, parseKey, reducedMotion } from './dom.js';
 
 const timeFormat = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', hour12: false });
 const dayFormat = new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -131,6 +131,26 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
   let activeRange = '';
   let lastSelection = '';
   let calendarSignature = '';
+
+  // Скрытые календари: выбор хранится в настройках расширения и переживает перезапуск Zen.
+  const hidden = new Set();
+  let hiddenLoaded = false;
+  const hiddenReady = browser.storage.local
+    .get('hiddenCalendars')
+    .then(({ hiddenCalendars }) => {
+      if (Array.isArray(hiddenCalendars)) for (const id of hiddenCalendars) hidden.add(String(id));
+    })
+    .catch(() => {})
+    .finally(() => {
+      hiddenLoaded = true;
+    });
+
+  function saveHidden() {
+    browser.storage.local.set({ hiddenCalendars: [...hidden] }).catch(() => {});
+  }
+
+  /** События дня без скрытых календарей. */
+  const visibleEvents = (key) => eventsForDay(payload, key).filter((event) => !hidden.has(String(event.calendarId)));
   let controller = null;
   let requestNumber = 0;
   let debounce = 0;
@@ -252,6 +272,24 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
   }
 
   legend.addEventListener('click', (event) => {
+    const toggle = event.target.closest('.calendar-toggle');
+    if (toggle) {
+      const id = toggle.dataset.calendarId;
+      if (hidden.has(id)) hidden.delete(id);
+      else hidden.add(id);
+      saveHidden();
+      updateCalendarList();
+      render();
+      return;
+    }
+    if (event.target.closest('.calendar-show-all')) {
+      for (const calendar of payload?.calendars || []) hidden.delete(String(calendar.id));
+      saveHidden();
+      updateCalendarList();
+      legend.querySelector('.calendar-toggle')?.focus();
+      render();
+      return;
+    }
     if (!event.target.closest('summary')) return;
     event.preventDefault();
     setCalendarMenu(menuAnimation ? !menuTargetOpen : !legend.open);
@@ -280,17 +318,44 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
     legend.replaceChildren();
     if (!payload) return;
     const summary = element('summary', 'calendar-list-title');
-    summary.append(element('span', '', `Календари · ${payload.calendars.length}`), downChevron());
+    summary.append(element('span', 'calendar-list-label'), downChevron());
     const items = element('ul', 'calendar-list-items');
     for (const calendar of payload.calendars) {
       const item = element('li', 'calendar-list-item');
-      const dot = element('span', 'event-color');
-      dot.style.backgroundColor = safeColor(calendar.color);
+      // Каждая строка — переключатель: клик скрывает календарь или показывает снова.
+      const toggle = element('button', 'calendar-toggle');
+      toggle.type = 'button';
+      toggle.dataset.calendarId = String(calendar.id);
+      const dot = element('span', 'calendar-dot');
+      dot.style.setProperty('--dot', safeColor(calendar.color));
       dot.setAttribute('aria-hidden', 'true');
-      item.append(dot, element('span', '', calendar.title + (calendar.source ? ` · ${calendar.source}` : '')));
+      toggle.append(dot, element('span', 'calendar-name', calendar.title + (calendar.source ? ` · ${calendar.source}` : '')), checkMark());
+      item.append(toggle);
       items.append(item);
     }
+    const showAll = element('li', 'calendar-list-footer');
+    const showAllButton = element('button', 'calendar-show-all', 'Показать все');
+    showAllButton.type = 'button';
+    showAll.append(showAllButton);
+    items.append(showAll);
     legend.append(summary, items);
+    updateCalendarList();
+  }
+
+  /** Обновить отметки и подпись «Календари · 4 из 6», не пересобирая меню (оно остаётся открытым). */
+  function updateCalendarList() {
+    if (!payload) return;
+    const total = payload.calendars.length;
+    let shown = 0;
+    for (const toggle of legend.querySelectorAll('.calendar-toggle')) {
+      const visible = !hidden.has(toggle.dataset.calendarId);
+      if (visible) shown += 1;
+      toggle.setAttribute('aria-pressed', String(visible));
+      toggle.title = visible ? 'Скрыть события этого календаря' : 'Показать события этого календаря';
+    }
+    legend.querySelector('.calendar-list-label').textContent =
+      shown === total ? `Календари · ${total}` : `Календари · ${shown} из ${total}`;
+    legend.querySelector('.calendar-list-footer').hidden = shown === total;
   }
 
   // ---------- Карточка события ----------
@@ -390,7 +455,7 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
       button.querySelector('.event-dots')?.remove();
       button.removeAttribute('title');
       if (!payload) continue;
-      const events = eventsForDay(payload, button.dataset.date);
+      const events = visibleEvents(button.dataset.date);
       if (!events.length) continue;
       const dots = element('span', 'event-dots');
       dots.setAttribute('aria-hidden', 'true');
@@ -406,6 +471,11 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
   }
 
   function render(emptyText) {
+    // Пока не прочитан список скрытых календарей, не рисуем: иначе их события мелькнут.
+    if (!hiddenLoaded && payload) {
+      hiddenReady.then(() => render(emptyText));
+      return;
+    }
     const current = getState();
     const selectionChanged = lastSelection !== current.selected;
     const previousScroll = list.scrollTop;
@@ -413,9 +483,17 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
 
     const fragment = document.createDocumentFragment();
     if (payload) {
-      const events = eventsForDay(payload, current.selected);
+      const events = visibleEvents(current.selected);
       count.textContent = events.length ? String(events.length) : '';
-      if (!events.length) fragment.append(emptyState('На этот день событий нет', 'День свободен'));
+      if (!events.length) {
+        // Отличаем «событий нет» от «все события в скрытых календарях».
+        const hiddenCount = eventsForDay(payload, current.selected).length;
+        fragment.append(
+          hiddenCount
+            ? emptyState('События этого дня скрыты', 'Их календари выключены в меню «Календари»')
+            : emptyState('На этот день событий нет', 'День свободен'),
+        );
+      }
       for (const event of events) {
         const calendar = payload.calendars.find((item) => item.id === event.calendarId) || {};
         const item = eventCard(event, calendar, current.selected);
