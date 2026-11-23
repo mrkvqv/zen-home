@@ -1,5 +1,8 @@
 # Zen Home
 
+[![Latest release](https://img.shields.io/github/v/release/mrkvqv/zen-home?label=version)](https://github.com/mrkvqv/zen-home/releases/latest)
+[![License: MIT](https://img.shields.io/github/license/mrkvqv/zen-home)](LICENSE)
+
 A personal start page for [Zen Browser](https://zen-browser.app), built as a Firefox extension: a clock, your Zen Essentials and Apple Calendar events — fast, local and with no external requests.
 
 ![Zen Home in the dark theme](docs/preview.png)
@@ -63,6 +66,8 @@ A temporary add-on is removed when Zen restarts.
 ### 3. Install it permanently
 
 Release builds of Zen only install add-ons signed by Mozilla. Signing is free, and an unlisted add-on is never published in the catalog.
+
+**Ready-made build**: download the signed `.xpi` from [Releases](https://github.com/mrkvqv/zen-home/releases/latest) and drag it into a Zen window. To sign your own changes, use one of the options below.
 
 **Through the website**: run `pnpm build`, then on [addons.mozilla.org](https://addons.mozilla.org/developers/addon/submit/distribution) choose **On your own** and upload `dist/zen_home-<version>.zip`. Once it is approved, install the signed `.xpi` from the version page.
 
