@@ -11,7 +11,8 @@ A personal start page for [Zen Browser](https://zen-browser.app), built as a Fir
 
 - **Opens where you expect it**: at Zen startup, from the toolbar button and with <kbd>⌃</kbd><kbd>⇧</kbd><kbd>H</kbd>. Keeps a single start tab in the current Space instead of piling up duplicates.
 - **Essentials**: shows the tabs pinned to Zen Essentials. A click switches to the already open pinned tab, <kbd>⌘</kbd>-click opens the site in a new tab.
-- **Calendar**: month grid with event dots and a day agenda. Event cards expand smoothly in place and show only the essentials: time, calendar, location, link, recurrence, alerts and attendees.
+- **Calendar**: month grid with event dots and a day agenda. Each card shows its calendar as a colored tag; a click slides the details in from the right: a date or time tile, location, link, recurrence, alerts and attendees.
+- **Four languages**: Russian, English, Polish and Belarusian, switched from the bottom-right corner. Dates and plural forms follow the language.
 - **Light and dark theme** that follow macOS automatically.
 - **Light on resources**: plain JavaScript modules with no framework and no build step; data refreshes every 30 seconds only while the page is visible.
 

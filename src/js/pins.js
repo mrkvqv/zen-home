@@ -3,6 +3,7 @@
 
 import { bridgeGet } from './bridge.js';
 import { EASE, element, linkArrow, reducedMotion } from './dom.js';
+import { t } from './i18n.js';
 
 const CACHE_KEY = 'zen-home-pins-v1'; // только адреса и иконки — для мгновенной отрисовки при запуске
 
@@ -83,6 +84,8 @@ export function createPins(nav) {
   let transition = null;
   let notice = null;
   let noticeTimer = 0;
+  let lastPins = null;
+  let messageKey = '';
 
   function notify(text) {
     if (!notice) {
@@ -98,20 +101,23 @@ export function createPins(nav) {
     }, 5000);
   }
 
-  function showMessage(text) {
+  function showMessage(key) {
     signature = '';
-    nav.replaceChildren(element('p', 'bookmarks-empty', text));
+    messageKey = key;
+    nav.replaceChildren(element('p', 'bookmarks-empty', t(key)));
   }
 
   function render(pins, animate) {
     const next = JSON.stringify(pins);
     if (next === signature) return;
+    lastPins = pins;
+    messageKey = '';
     const fragment = document.createDocumentFragment();
     for (const pin of pins) {
       const link = pin && typeof pin === 'object' ? card(pin) : null;
       if (link) fragment.append(link);
     }
-    if (!fragment.childNodes.length) fragment.append(element('p', 'bookmarks-empty', 'Закреплённых вкладок пока нет'));
+    if (!fragment.childNodes.length) fragment.append(element('p', 'bookmarks-empty', t('noPins')));
 
     const focused = nav.contains(document.activeElement) ? document.activeElement.href : null;
     signature = next;
@@ -138,7 +144,7 @@ export function createPins(nav) {
       if (controller === request) render(data.pins, signature !== '');
     } catch (error) {
       if (controller !== request || error.name === 'AbortError') return;
-      if (!signature) showMessage('Не удалось загрузить закреплённые вкладки');
+      if (!signature) showMessage('pinsFailed');
     }
   }
 
@@ -152,9 +158,9 @@ export function createPins(nav) {
     link.setAttribute('aria-busy', 'true');
     try {
       const result = await browser.runtime.sendMessage({ type: 'activate-pin', url: link.href });
-      if (!result?.ok) notify('Закреплённая вкладка не найдена. Открой сайт с зажатой ⌘, чтобы открыть его в новой вкладке.');
+      if (!result?.ok) notify(t('pinMissing'));
     } catch {
-      notify('Не удалось переключить вкладку. Попробуй ещё раз.');
+      notify(t('pinFailed'));
     } finally {
       link.removeAttribute('aria-busy');
     }
@@ -168,5 +174,15 @@ export function createPins(nav) {
     // Кэша ещё нет.
   }
 
-  return { update };
+  /** Перевести надписи после смены языка (названия сайтов не меняются). */
+  function relabel() {
+    if (messageKey) {
+      showMessage(messageKey);
+    } else if (lastPins) {
+      signature = '';
+      render(lastPins, false);
+    }
+  }
+
+  return { update, relabel };
 }

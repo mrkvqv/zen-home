@@ -2,6 +2,25 @@
 
 All notable changes to Zen Home are listed here. Versions follow the numbers signed on addons.mozilla.org.
 
+## [1.1.0] — 2026-11-26
+
+### Added
+
+- Language switcher in the bottom-right corner: Russian, English, Polish and Belarusian. Dates, weekdays and plural forms follow the chosen language; the choice is saved, and the browser language is used by default.
+- Event cards show their calendar as a colored tag next to the time.
+- Multi-day events get a date tile (for example `23 – 26` with weekdays and times); timed events get a matching time tile with the duration.
+
+### Changed
+
+- Event details slide in from the right next to the title instead of expanding downwards; on narrow windows they still open below.
+- A card opens and closes by clicking anywhere on it; the arrow flips with a soft animation, and closing is smoother.
+- The title keeps its place when a card opens.
+- English dates read "Wednesday, 23 December".
+
+### Fixed
+
+- All-day events no longer show a reversed date range like `25 – 24`.
+
 ## [1.0.2] — 2026-11-23
 
 ### Changed
@@ -30,6 +49,7 @@ First signed release.
 - Light and dark theme that follow macOS.
 - Zen Calendar Bridge: a local read-only helper for Apple Calendar and Essentials.
 
+[1.1.0]: https://github.com/mrkvqv/zen-home/releases/tag/v1.1.0
 [1.0.2]: https://github.com/mrkvqv/zen-home/releases/tag/v1.0.2
 [1.0.1]: https://github.com/mrkvqv/zen-home/releases/tag/v1.0.2
 [1.0.0]: https://github.com/mrkvqv/zen-home/releases/tag/v1.0.0

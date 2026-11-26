@@ -1,13 +1,17 @@
 // События выбранного дня, точки событий в сетке месяца и список календарей.
 
 import { bridgeGet } from './bridge.js';
-import { addDays, checkMark, dateKey, downChevron, EASE, element, parseKey, reducedMotion } from './dom.js';
+import { addDays, checkMark, dateKey, downChevron, drawerChevron, EASE, element, parseKey, reducedMotion } from './dom.js';
+import { dateFormat, locale, plural, t } from './i18n.js';
 
-const timeFormat = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', hour12: false });
-const dayFormat = new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
-const dateTimeFormat = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' });
-const fullDayFormat = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long' });
-const shortDayFormat = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' });
+// Форматы на текущем языке (i18n.js кэширует их и пересоздаёт при смене языка).
+const timeFormat = () => dateFormat({ hour: '2-digit', minute: '2-digit' });
+const dayFormat = () => dateFormat({ weekday: 'long', day: 'numeric', month: 'long' });
+const dateTimeFormat = () => dateFormat({ dateStyle: 'medium', timeStyle: 'short' });
+const fullDayFormat = () => dateFormat({ dateStyle: 'long' });
+const shortDayFormat = () => dateFormat({ day: 'numeric', month: 'long' });
+const weekdayShort = (date) => dateFormat({ weekday: 'short' }).format(date).replace('.', '');
+const formatTime = (date) => timeFormat().format(date);
 
 const FRESH_FOR = 30_000; // данные моложе 30 секунд не перезапрашиваем
 const MAX_CACHED_RANGES = 12;
@@ -37,21 +41,33 @@ function eventsForDay(payload, key) {
       return eventStart < end && (eventEnd > start || (eventStart === eventEnd && eventStart >= start));
     })
     .sort(
-      (a, b) => Number(b.allDay) - Number(a.allDay) || Date.parse(a.start) - Date.parse(b.start) || a.title.localeCompare(b.title, 'ru'),
+      (a, b) =>
+        Number(b.allDay) - Number(a.allDay) || Date.parse(a.start) - Date.parse(b.start) || a.title.localeCompare(b.title, locale()),
     );
 }
 
 function eventTime(event, key) {
-  if (event.allDay) return 'Весь день';
+  if (event.allDay) return t('allDay');
   const start = new Date(event.start);
   const end = new Date(event.end);
   const dayStart = parseKey(key);
   const nextDay = addDays(dayStart, 1);
-  if (start.getTime() === end.getTime()) return timeFormat.format(start);
-  if (start < dayStart && end >= nextDay) return 'Продолжается';
-  if (start < dayStart) return `до ${timeFormat.format(end)}`;
-  if (end > nextDay) return `с ${timeFormat.format(start)}`;
-  return `${timeFormat.format(start)}–${timeFormat.format(end)}`;
+  if (start.getTime() === end.getTime()) return formatTime(start);
+  if (start < dayStart && end >= nextDay) return t('ongoing');
+  if (start < dayStart) return t('untilTime', { time: formatTime(end) });
+  if (end > nextDay) return t('fromTime', { time: formatTime(start) });
+  return `${formatTime(start)}–${formatTime(end)}`;
+}
+
+/**
+ * Первый и последний день события «на весь день».
+ * Конец в данных не включён (endDay — следующий день), но мост иногда отдаёт endDay = startDay;
+ * тогда последний день не может оказаться раньше первого.
+ */
+function allDayRange(event) {
+  const first = parseKey(event.startDay);
+  const end = addDays(parseKey(event.endDay), -1);
+  return { first, last: end < first ? first : end };
 }
 
 function personName(person) {
@@ -65,56 +81,61 @@ function personName(person) {
 }
 
 function recurrenceText(rule) {
-  const single = ['Каждый день', 'Каждую неделю', 'Каждый месяц', 'Каждый год'];
-  const units = [
-    ['день', 'дня', 'дней'],
-    ['неделю', 'недели', 'недель'],
-    ['месяц', 'месяца', 'месяцев'],
-    ['год', 'года', 'лет'],
-  ];
   const n = rule.interval;
-  const last = n % 10;
-  const hundred = n % 100;
-  const form = hundred >= 11 && hundred <= 14 ? 2 : last === 1 ? 0 : last >= 2 && last <= 4 ? 1 : 2;
-  let label = n === 1 ? single[rule.frequency] || 'Повторяется' : `Раз в ${n} ${units[rule.frequency]?.[form] || 'периодов'}`;
+  const unit = t('repeatUnits')[rule.frequency];
+  let label =
+    n === 1
+      ? t('repeatEvery')[rule.frequency] || t('repeats')
+      : t('repeatEveryN', { n, unit: unit ? plural(unit, n, { n }) : t('repeatUnitFallback') });
   if (rule.daysOfWeek?.length) {
-    const names = ['', 'вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+    // В правиле дни недели считаются с воскресенья: 1 — воскресенье, 7 — суббота.
+    const sunday = new Date(2024, 0, 7);
     label += `, ${rule.daysOfWeek
-      .map((value) => names[value.day])
-      .filter(Boolean)
+      .filter((value) => value.day >= 1 && value.day <= 7)
+      .map((value) => weekdayShort(addDays(sunday, value.day - 1)))
       .join(', ')}`;
   }
-  if (rule.daysOfMonth?.length) label += `, числа: ${rule.daysOfMonth.join(', ')}`;
-  if (rule.end?.date) label += `, до ${fullDayFormat.format(new Date(rule.end.date))}`;
-  if (rule.end?.count) label += `, ${rule.end.count} повторений`;
+  if (rule.daysOfMonth?.length) label += `, ${t('repeatDaysOfMonth', { list: rule.daysOfMonth.join(', ') })}`;
+  if (rule.end?.date) label += `, ${t('repeatUntil', { date: fullDayFormat().format(new Date(rule.end.date)) })}`;
+  if (rule.end?.count) label += `, ${plural('repeatCount', rule.end.count)}`;
   return label;
 }
 
-function alarmText(alarm) {
-  if (alarm.absoluteDate) return dateTimeFormat.format(new Date(alarm.absoluteDate));
-  const seconds = Number(alarm.relativeOffset);
-  if (!seconds) return 'В момент события';
-  let minutes = Math.round(Math.abs(seconds) / 60);
+/** Длительность: «45 мин», «1 ч 30 мин», «2 д 4 ч» (и так же на других языках). */
+function durationText(ms) {
+  let minutes = Math.round(Math.abs(ms) / 60000);
+  if (minutes <= 0) return '';
   const days = Math.floor(minutes / 1440);
   minutes %= 1440;
   const hours = Math.floor(minutes / 60);
   minutes %= 60;
-  const duration = [days && `${days} дн.`, hours && `${hours} ч.`, minutes && `${minutes} мин.`].filter(Boolean).join(' ');
-  return (seconds < 0 ? 'За ' : 'Через ') + (duration || 'меньше минуты');
+  // Дни показываем только с часами, без минут — так короче.
+  const parts = days
+    ? [t('durationDays', { n: days }), hours && t('durationHours', { n: hours })]
+    : [hours && t('durationHours', { n: hours }), minutes && t('durationMinutes', { n: minutes })];
+  return parts.filter(Boolean).join(' ');
 }
 
-const STATUS_TEXT = {
-  no_token: 'Мост не настроен',
-  unauthorized: 'Неверный ключ моста',
-  permission: 'Нужен доступ к Календарю',
-  offline: 'Мост календаря не отвечает',
-  service: 'Календарь временно недоступен',
+function alarmText(alarm) {
+  if (alarm.absoluteDate) return dateTimeFormat().format(new Date(alarm.absoluteDate));
+  const seconds = Number(alarm.relativeOffset);
+  if (!seconds) return t('alarmAtStart');
+  const time = durationText(seconds * 1000) || t('lessThanMinute');
+  return t(seconds < 0 ? 'alarmBefore' : 'alarmAfter', { time });
+}
+
+const STATUS_KEYS = {
+  no_token: 'statusNoToken',
+  unauthorized: 'statusUnauthorized',
+  permission: 'statusPermission',
+  offline: 'statusOffline',
+  service: 'statusService',
 };
 
-const EMPTY_TEXT = {
-  permission: 'Разреши доступ Zen Calendar Bridge в настройках macOS: «Конфиденциальность и безопасность → Календари».',
-  offline: 'Локальный помощник не отвечает. Нажми «Обновить», чтобы повторить подключение.',
-  service: 'Локальный помощник не отвечает. Нажми «Обновить», чтобы повторить подключение.',
+const EMPTY_KEYS = {
+  permission: 'emptyPermission',
+  offline: 'emptyOffline',
+  service: 'emptyOffline',
 };
 
 export function createAgenda(root, { getState, onSetupNeeded }) {
@@ -206,7 +227,8 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
     for (const other of list.querySelectorAll('.event[data-open]')) {
       if (other === item) continue;
       if (other.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING) {
-        shift += other.querySelector('.event-panel').getBoundingClientRect().height;
+        // Насколько открытая карточка выше закрытой (закрытая = строка с названием).
+        shift += Math.max(0, other.getBoundingClientRect().height - other.querySelector('.event-head').offsetHeight - 2);
       }
       setOpen(other, false);
     }
@@ -215,7 +237,12 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
     if (!open) return;
 
     const bounds = item.getBoundingClientRect();
-    const grow = panel.firstElementChild.scrollHeight - panel.getBoundingClientRect().height;
+    // Подробности встают справа от названия (широкий экран) или под ним (узкий, см. home.css).
+    const content = panel.firstElementChild.scrollHeight;
+    const current = panel.getBoundingClientRect().height;
+    const headHeight = item.querySelector('.event-head').offsetHeight;
+    const beside = getComputedStyle(item).flexWrap === 'nowrap';
+    const grow = beside ? Math.max(headHeight, content) - Math.max(headHeight, current) : content - current;
     // Пока карточка растёт, списку не хватает высоты и плавная прокрутка упёрлась бы в конец.
     // Временный запас снизу убираем в конце анимации.
     // Нужен, только если карточка вылезет за низ списка; иначе место отдаст пунктир в конце списка.
@@ -236,9 +263,12 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
   }
 
   list.addEventListener('click', (event) => {
-    // Открывается и закрывается только по верхней части карточки (кнопка с названием).
-    const head = event.target.closest('.event-head');
-    if (head) toggleEvent(head.closest('.event'));
+    // Открывается и закрывается кликом в любом месте карточки,
+    // кроме ссылок и случая, когда пользователь выделил текст мышкой.
+    const item = event.target.closest('.event');
+    if (!item || event.target.closest('a')) return;
+    if (String(window.getSelection())) return;
+    toggleEvent(item);
   });
 
   // ---------- Список календарей ----------
@@ -334,7 +364,7 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
       items.append(item);
     }
     const showAll = element('li', 'calendar-list-footer');
-    const showAllButton = element('button', 'calendar-show-all', 'Показать все');
+    const showAllButton = element('button', 'calendar-show-all', t('showAll'));
     showAllButton.type = 'button';
     showAll.append(showAllButton);
     items.append(showAll);
@@ -351,10 +381,10 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
       const visible = !hidden.has(toggle.dataset.calendarId);
       if (visible) shown += 1;
       toggle.setAttribute('aria-pressed', String(visible));
-      toggle.title = visible ? 'Скрыть события этого календаря' : 'Показать события этого календаря';
+      toggle.title = t(visible ? 'hideCalendar' : 'showCalendar');
     }
     legend.querySelector('.calendar-list-label').textContent =
-      shown === total ? `Календари · ${total}` : `Календари · ${shown} из ${total}`;
+      shown === total ? t('calendarsAll', { total }) : t('calendarsSome', { shown, total });
     legend.querySelector('.calendar-list-footer').hidden = shown === total;
   }
 
@@ -372,15 +402,113 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
   /** Время и дата события одной строкой. */
   function whenText(event) {
     if (event.allDay) {
-      const first = parseKey(event.startDay);
-      const last = addDays(parseKey(event.endDay), -1);
-      return last > first ? `${fullDayFormat.format(first)} — ${fullDayFormat.format(last)}` : fullDayFormat.format(first);
+      const { first, last } = allDayRange(event);
+      const full = fullDayFormat();
+      return last > first ? `${full.format(first)} — ${full.format(last)}` : full.format(first);
     }
     const start = new Date(event.start);
     const end = new Date(event.end);
-    if (start.getTime() === end.getTime()) return dateTimeFormat.format(start);
-    if (dateKey(start) === dateKey(end)) return `${shortDayFormat.format(start)}, ${timeFormat.format(start)}–${timeFormat.format(end)}`;
-    return `${dateTimeFormat.format(start)} — ${dateTimeFormat.format(end)}`;
+    if (start.getTime() === end.getTime()) return dateTimeFormat().format(start);
+    if (dateKey(start) === dateKey(end)) return `${shortDayFormat().format(start)}, ${formatTime(start)}–${formatTime(end)}`;
+    return `${dateTimeFormat().format(start)} — ${dateTimeFormat().format(end)}`;
+  }
+
+  const monthShort = (date) => dateFormat({ month: 'short' }).format(date).replace('.', '').slice(0, 3);
+
+  /** Число с подписью под ним внутри листка: «25» и «ср 10:00». */
+  function tilePoint(date, time) {
+    const point = element('span', 'event-when-point');
+    const caption = element('span', 'event-when-caption', weekdayShort(date));
+    if (time) caption.append(' ', element('span', 'event-when-caption-time', time));
+    point.append(element('span', 'event-when-day', String(date.getDate())), caption);
+    return point;
+  }
+
+  /** Листок календаря для события на несколько дней: месяц сверху, «25 – 27», под числами дни недели (и время). */
+  function dateTile(first, last, startTime = '', endTime = '') {
+    const sameMonth = first.getMonth() === last.getMonth() && first.getFullYear() === last.getFullYear();
+    const tile = element('span', 'event-when-tile event-when-tile-range');
+    tile.setAttribute('aria-hidden', 'true');
+    const month = element('span', 'event-when-month', monthShort(first));
+    // Между месяцами — короткая черта, а не символ «–».
+    if (!sameMonth) month.append(element('span', 'event-when-month-sep'), monthShort(last));
+    const span = element('span', 'event-when-span');
+    span.append(tilePoint(first, startTime), element('span', 'event-when-sep'), tilePoint(last, endTime));
+    tile.append(month, span);
+    return tile;
+  }
+
+  /**
+   * Такой же листок для события в пределах одного дня: сверху длительность,
+   * крупно «13:15 – 14:45» (у события без длительности — одно время).
+   */
+  function timeTile(startTime, endTime, duration) {
+    const tile = element('span', 'event-when-tile event-when-tile-range event-when-tile-time');
+    tile.setAttribute('aria-hidden', 'true');
+    const span = element('span', 'event-when-span');
+    const point = (time) => {
+      const item = element('span', 'event-when-point');
+      item.append(element('span', 'event-when-day', time));
+      return item;
+    };
+    span.append(point(startTime));
+    if (endTime) span.append(element('span', 'event-when-sep'), point(endTime));
+    if (duration) tile.append(element('span', 'event-when-month', duration));
+    tile.append(span);
+    return tile;
+  }
+
+  /**
+   * Блок «Когда». Событие со временем в пределах дня — листок со временем и длительностью.
+   * Несколько дней — листок с датами «25 – 27», рядом длительность. Весь день — просто текст.
+   */
+  function whenBlock(event) {
+    let first;
+    let last;
+    let main;
+    let sub;
+    let startTime = '';
+    let lastTime = '';
+    let tile = null;
+    if (event.allDay) {
+      ({ first, last } = allDayRange(event));
+      const days = Math.round((last - first) / 86400000) + 1;
+      main = days > 1 ? plural('days', days) : t('allDay');
+      sub = days > 1 ? t('allDayLower') : '';
+    } else {
+      first = new Date(event.start);
+      const end = new Date(event.end);
+      // Событие до полуночи (22:00–00:00) считаем однодневным; конец раньше начала — тоже один день.
+      last = end > first ? new Date(end.getTime() - 1) : first;
+      startTime = formatTime(first);
+      const endTime = formatTime(end);
+      const duration = durationText(end - first);
+      if (dateKey(first) === dateKey(last)) {
+        // Дату и день недели не повторяем: агенда и так показывает один выбранный день.
+        tile = timeTile(startTime, end > first ? endTime : '', duration);
+      } else {
+        // Конец ровно в полночь показываем как 24:00 предыдущего дня.
+        lastTime = dateKey(last) !== dateKey(end) ? '24:00' : endTime;
+        main = duration;
+        sub = '';
+      }
+    }
+
+    const block = element('div', 'event-when');
+    block.setAttribute('role', 'group');
+    block.setAttribute('aria-label', t('when', { text: whenText(event) }));
+    // Листок с датами нужен только событиям на несколько дней: один день и так выбран в календаре.
+    if (dateKey(first) !== dateKey(last)) block.append(dateTile(first, last, startTime, lastTime));
+    if (tile) {
+      block.append(tile);
+      return block;
+    }
+    const text = element('span', 'event-when-text');
+    text.setAttribute('aria-hidden', 'true');
+    text.append(element('span', 'event-when-main', main));
+    if (sub) text.append(element('span', 'event-when-sub', sub));
+    block.append(text);
+    return block;
   }
 
   let eventNumber = 0;
@@ -395,50 +523,91 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
     head.setAttribute('aria-expanded', 'false');
     head.setAttribute('aria-controls', panelId);
     const dot = element('span', 'event-color');
-    dot.style.backgroundColor = safeColor(calendar.color);
     dot.setAttribute('aria-hidden', 'true');
+    // Капсула с календарём видна без разворота карточки.
+    item.style.setProperty('--calendar', safeColor(calendar.color));
+    const tag = element('span', 'event-calendar');
+    tag.title = calendar.title;
+    tag.append(dot, element('span', 'event-calendar-name', calendar.title));
     const timing = element('span', 'event-timing');
-    timing.append(dot, element('span', 'event-time', eventTime(event, selected)));
+    timing.append(tag, element('span', 'event-time', eventTime(event, selected)));
     const text = element('span', 'event-summary-text');
-    text.append(timing, element('span', 'event-title', event.title || 'Без названия'));
-    head.append(text, downChevron('event-expand'));
+    const title = element('span', 'event-title', event.title || t('untitled'));
+    title.title = title.textContent; // в раскрытой карточке длинное название обрезается «…»
+    text.append(timing, title);
+    head.append(text);
 
     const fields = element('dl', 'event-fields');
-    describe(fields, 'Когда', whenText(event));
-    describe(fields, 'Календарь', calendar.title);
-    describe(fields, 'Место', event.location || event.structuredLocation?.title);
+    describe(fields, t('location'), event.location || event.structuredLocation?.title);
     const url = safeURL(event.url);
     if (url) {
       const link = element('a', 'event-url', url.host.replace(/^www\./, ''));
       link.href = url.href;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
-      describe(fields, 'Ссылка', link);
+      describe(fields, t('link'), link);
     }
-    if (event.recurrence?.length) describe(fields, 'Повтор', event.recurrence.map(recurrenceText).join('; '));
-    if (event.alarms?.length) describe(fields, 'Напоминания', event.alarms.map(alarmText).join('; '));
-    if (event.attendees?.length) describe(fields, 'Участники', event.attendees.map(personName).filter(Boolean).join(', '));
+    if (event.recurrence?.length) describe(fields, t('recurrence'), event.recurrence.map(recurrenceText).join('; '));
+    if (event.alarms?.length) describe(fields, t('alarms'), event.alarms.map(alarmText).join('; '));
+    if (event.attendees?.length) describe(fields, t('attendees'), event.attendees.map(personName).filter(Boolean).join(', '));
 
     const body = element('div', 'event-body');
-    body.append(fields);
+    body.append(whenBlock(event));
+    if (fields.childElementCount) body.append(fields);
     const inner = element('div', 'event-panel-inner');
     inner.append(body);
     const panel = element('div', 'event-panel');
     panel.id = panelId;
     panel.setAttribute('role', 'region');
-    panel.setAttribute('aria-label', event.title || 'Событие');
+    panel.setAttribute('aria-label', event.title || t('event'));
     panel.append(inner);
 
-    item.append(head, panel);
+    // Подробности выезжают справа налево в ту же строку, что и название (см. home.css).
+    // Стрелка — отдельный элемент справа: по клику на неё карточка тоже раскрывается.
+    const toggle = element('span', 'event-toggle');
+    toggle.setAttribute('aria-hidden', 'true'); // для клавиатуры и чтения с экрана есть кнопка с названием
+    const circle = element('span', 'event-toggle-circle');
+    circle.append(drawerChevron());
+    toggle.append(circle);
+    item.append(head, panel, toggle);
     return item;
   }
+
+  // ---------- Ширина подробностей ----------
+  // Если подробности переносятся на две строки, блок по умолчанию занимает всю допустимую ширину,
+  // и справа остаётся пустота. Подгоняем ширину под самую длинную строку: тогда строки начинаются
+  // от одной линии слева, а весь блок прижат к стрелке.
+
+  const stacked = window.matchMedia('(max-width: 760px)');
+
+  function fitBody(body) {
+    body.style.removeProperty('width');
+    if (stacked.matches) return;
+    const box = body.getBoundingClientRect();
+    if (!box.width) return;
+    let right = box.left;
+    for (const part of body.querySelectorAll('.event-when, .event-field')) right = Math.max(right, part.getBoundingClientRect().right);
+    const style = getComputedStyle(body);
+    const width = right - box.left + parseFloat(style.paddingRight) + parseFloat(style.borderRightWidth);
+    if (width < box.width - 1) body.style.width = `${Math.ceil(width)}px`;
+  }
+
+  const fitBodies = () => list.querySelectorAll('.event-body').forEach(fitBody);
+
+  // Ширина зависит от шрифта: пересчитываем, когда он догрузится, и при изменении окна.
+  document.fonts?.ready.then(fitBodies);
+  let resizeTimer = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(fitBodies, 100);
+  });
 
   // ---------- Отрисовка ----------
 
   /** Пунктирная строка «Больше событий нет» в конце списка (растягивается до низа блока). */
   function restOfDay() {
     const rest = element('div', 'agenda-rest');
-    rest.append(element('p', 'agenda-empty-note', 'Больше событий нет'));
+    rest.append(element('p', 'agenda-empty-note', t('noMoreEvents')));
     return rest;
   }
 
@@ -466,20 +635,20 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
         dots.append(dot);
       }
       button.append(dots);
-      button.title = `Событий: ${events.length}`;
+      button.title = t('eventsCount', { n: events.length });
     }
   }
 
-  function render(emptyText) {
+  function render(emptyKey) {
     // Пока не прочитан список скрытых календарей, не рисуем: иначе их события мелькнут.
     if (!hiddenLoaded && payload) {
-      hiddenReady.then(() => render(emptyText));
+      hiddenReady.then(() => render(emptyKey));
       return;
     }
     const current = getState();
     const selectionChanged = lastSelection !== current.selected;
     const previousScroll = list.scrollTop;
-    heading.textContent = dayFormat.format(parseKey(current.selected));
+    heading.textContent = dayFormat().format(parseKey(current.selected));
 
     const fragment = document.createDocumentFragment();
     if (payload) {
@@ -488,11 +657,7 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
       if (!events.length) {
         // Отличаем «событий нет» от «все события в скрытых календарях».
         const hiddenCount = eventsForDay(payload, current.selected).length;
-        fragment.append(
-          hiddenCount
-            ? emptyState('События этого дня скрыты', 'Их календари выключены в меню «Календари»')
-            : emptyState('На этот день событий нет', 'День свободен'),
-        );
+        fragment.append(hiddenCount ? emptyState(t('hiddenTitle'), t('hiddenNote')) : emptyState(t('noEvents'), t('freeDay')));
       }
       for (const event of events) {
         const calendar = payload.calendars.find((item) => item.id === event.calendarId) || {};
@@ -503,9 +668,11 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
       if (events.length) fragment.append(restOfDay());
     } else {
       count.textContent = '';
-      fragment.append(emptyState(emptyText || 'Подключение к календарю…'));
+      fragment.append(emptyState(t(emptyKey || 'connecting')));
+      lastEmptyKey = emptyKey || '';
     }
     list.replaceChildren(fragment);
+    fitBodies();
     list.style.removeProperty('--event-list-extra');
     edgesObserver.disconnect();
     edgesObserver.observe(list);
@@ -525,8 +692,18 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
 
   const rangeOf = (state) => `${state.start}/${state.end}`;
 
+  // Что сейчас написано в строке статуса — чтобы перевести её при смене языка.
+  let statusState = { key: '' };
+  let lastEmptyKey = '';
+
+  function showStatus(state) {
+    statusState = state;
+    if (state.key === 'updated') status.textContent = t('updated', { time: formatTime(new Date(state.updatedAt)) });
+    else status.textContent = state.key ? t(state.key) : '';
+  }
+
   function setStatus(updatedAt) {
-    status.textContent = `Календарь · обновлено ${timeFormat.format(new Date(updatedAt))}`;
+    showStatus({ key: 'updated', updatedAt });
   }
 
   async function load(force = false) {
@@ -547,7 +724,7 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
     controller = new AbortController();
     const number = ++requestNumber;
     refresh.disabled = true;
-    status.textContent = 'Обновление…';
+    showStatus({ key: 'updating' });
     try {
       const data = await bridgeGet('/v1/events', { start: current.start, end: current.end }, { signal: controller.signal });
       if (number !== requestNumber) return;
@@ -569,14 +746,14 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
       setStatus(data.updatedAt);
     } catch (error) {
       if (number !== requestNumber || error.name === 'AbortError') return;
-      const code = error.message in STATUS_TEXT ? error.message : 'service';
-      status.textContent = STATUS_TEXT[code];
+      const code = error.message in STATUS_KEYS ? error.message : 'service';
+      showStatus({ key: STATUS_KEYS[code] });
       if (code === 'no_token' || code === 'unauthorized') {
         payload = null;
         render();
         onSetupNeeded(list);
       } else if (!payload) {
-        render(EMPTY_TEXT[code]);
+        render(EMPTY_KEYS[code]);
       }
     } finally {
       if (number === requestNumber) refresh.disabled = false;
@@ -599,5 +776,12 @@ export function createAgenda(root, { getState, onSetupNeeded }) {
 
   refresh.addEventListener('click', () => load(true));
 
-  return { update, load };
+  /** Перевести всё на новый язык: карточки, меню календарей, статус. */
+  function relabel() {
+    calendarSignature = '';
+    render(payload ? undefined : lastEmptyKey);
+    showStatus(statusState);
+  }
+
+  return { update, load, relabel };
 }

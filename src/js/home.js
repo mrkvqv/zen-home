@@ -3,11 +3,16 @@
 import { createAgenda } from './agenda.js';
 import { saveToken } from './bridge.js';
 import { createCalendar } from './calendar.js';
+import { loadLanguage, onLanguageChange, t, translatePage } from './i18n.js';
+import { createLanguageMenu } from './language-menu.js';
 import { createPins } from './pins.js';
 
 const REFRESH_EVERY = 30_000;
 
 const root = document.querySelector('.scene');
+// Язык читаем до первой отрисовки, чтобы надписи не мелькнули на другом языке.
+await loadLanguage();
+createLanguageMenu(document.querySelector('[data-lang-menu]'));
 const pins = createPins(root.querySelector('[data-bookmarks]'));
 
 let agenda;
@@ -18,6 +23,7 @@ agenda = createAgenda(root, { getState: () => calendar.state(), onSetupNeeded: s
 function showSetup(container) {
   if (container.querySelector('[data-setup-form]')) return;
   const form = document.querySelector('template[data-setup]').content.firstElementChild.cloneNode(true);
+  translatePage(form);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const token = form.elements.token.value.trim();
@@ -25,8 +31,7 @@ function showSetup(container) {
       await saveToken(token);
       refreshAll();
     } catch {
-      form.querySelector('.setup-text').textContent =
-        'Без доступа к 127.0.0.1:8766 расширение не сможет получить события. Попробуй ещё раз и нажми «Разрешить».';
+      form.querySelector('.setup-text').textContent = t('setupDenied');
     }
   });
   container.replaceChildren(form);
@@ -40,6 +45,15 @@ function refreshAll() {
 
 calendar.start();
 pins.update();
+
+// Смена языка: перерисовать всё, что собирается в коде (разметку переводит i18n.js).
+onLanguageChange(() => {
+  calendar.relabel();
+  agenda.relabel();
+  pins.relabel();
+  const form = root.querySelector('[data-setup-form]');
+  if (form) translatePage(form);
+});
 
 // Обновление: при возвращении на вкладку и раз в 30 секунд, пока страница видна.
 let lastRefresh = Date.now();

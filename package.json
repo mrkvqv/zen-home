@@ -1,6 +1,6 @@
 {
   "name": "zen-home",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "private": true,
   "description": "Personal start page for Zen Browser as a Firefox extension: clock, Essentials and Apple Calendar events.",
   "license": "MIT",

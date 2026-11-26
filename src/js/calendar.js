@@ -1,12 +1,14 @@
 // Часы, дата и сетка месяца. Сообщает наружу о смене выбранного дня через onChange.
 
 import { addDays, dateKey, parseKey, sameMonth, sideChevron } from './dom.js';
+import { dateFormat, t } from './i18n.js';
 
-const fullDate = new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-const longDate = new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
-const shortDate = new Intl.DateTimeFormat('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' });
-const monthFormat = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' });
-const clockFormat = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', hour12: false });
+// Форматы берутся заново при каждой отрисовке: язык можно сменить на лету.
+const fullDate = () => dateFormat({ weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+const longDate = () => dateFormat({ weekday: 'long', day: 'numeric', month: 'long' });
+const shortDate = () => dateFormat({ weekday: 'short', day: 'numeric', month: 'short' });
+const monthFormat = () => dateFormat({ month: 'long', year: 'numeric' });
+const clockFormat = () => dateFormat({ hour: '2-digit', minute: '2-digit' });
 
 export function createCalendar(root, { onChange }) {
   const q = (selector) => root.querySelector(selector);
@@ -18,6 +20,7 @@ export function createCalendar(root, { onChange }) {
   const dayRows = q('[data-days]');
   const selectedLabel = q('[data-selected-date]');
   const todayButton = q('[data-today]');
+  const weekdays = q('[data-weekdays]');
 
   let selected = parseKey(dateKey(new Date()));
   let view = new Date(selected.getFullYear(), selected.getMonth(), 1);
@@ -30,11 +33,14 @@ export function createCalendar(root, { onChange }) {
     const today = dateKey(now);
     const selectedKey = dateKey(selected);
     const offset = (view.getDay() + 6) % 7; // неделя начинается с понедельника
-    const title = monthFormat.format(view).replace(' г.', '');
+    // «ноябрь 2026 г.» / «лістапад 2026 г.» — без «г.».
+    const title = monthFormat()
+      .format(view)
+      .replace(/\s*г\.$/, '');
 
     monthLabel.textContent = title;
     monthTable.setAttribute('aria-label', title);
-    selectedLabel.textContent = shortDate.format(selected);
+    selectedLabel.textContent = shortDate().format(selected);
     selectedLabel.dateTime = selectedKey;
     todayButton.disabled = selectedKey === today && sameMonth(view, now);
 
@@ -52,7 +58,7 @@ export function createCalendar(root, { onChange }) {
         button.className = 'day';
         button.dataset.date = key;
         button.textContent = value.getDate();
-        button.setAttribute('aria-label', fullDate.format(value));
+        button.setAttribute('aria-label', fullDate().format(value));
         button.setAttribute('aria-pressed', String(isSelected));
         button.tabIndex = isSelected ? 0 : -1;
         if (isSelected) selectedVisible = true;
@@ -136,10 +142,10 @@ export function createCalendar(root, { onChange }) {
   function tick() {
     const now = new Date();
     const today = dateKey(now);
-    const time = clockFormat.format(now);
+    const time = clockFormat().format(now);
     if (clock.textContent !== time) {
       clock.textContent = time;
-      clock.setAttribute('aria-label', `Текущее время, ${time}`);
+      clock.setAttribute('aria-label', t('currentTime', { time }));
     }
     clock.dateTime = `${today}T${time}`;
     if (lastToday !== today) {
@@ -148,7 +154,7 @@ export function createCalendar(root, { onChange }) {
         selected = parseKey(today);
         view = new Date(now.getFullYear(), now.getMonth(), 1);
       }
-      dateLabel.textContent = longDate.format(now);
+      dateLabel.textContent = longDate().format(now);
       dateLabel.dateTime = today;
       render();
     }
@@ -160,5 +166,35 @@ export function createCalendar(root, { onChange }) {
     if (!document.hidden) tick();
   });
 
-  return { start: tick, state };
+  /** Подписи дней недели над сеткой: «пн … вс», полное название — для чтения с экрана. */
+  function renderWeekdays() {
+    const monday = new Date(2024, 0, 1); // 1 января 2024 — понедельник
+    const short = dateFormat({ weekday: 'short' });
+    const long = dateFormat({ weekday: 'long' });
+    const cells = [];
+    for (let index = 0; index < 7; index++) {
+      const day = addDays(monday, index);
+      const cell = document.createElement('th');
+      cell.scope = 'col';
+      cell.textContent = short.format(day).replace('.', '');
+      cell.setAttribute('aria-label', long.format(day));
+      cells.push(cell);
+    }
+    weekdays.replaceChildren(...cells);
+  }
+
+  /** Перерисовать всё после смены языка. */
+  function relabel() {
+    renderWeekdays();
+    const now = new Date();
+    const time = clockFormat().format(now);
+    clock.textContent = time;
+    clock.setAttribute('aria-label', t('currentTime', { time }));
+    dateLabel.textContent = longDate().format(now);
+    render();
+  }
+
+  renderWeekdays();
+
+  return { start: tick, state, relabel };
 }

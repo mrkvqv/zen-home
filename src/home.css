@@ -110,6 +110,8 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
+  /* Шрифт для всей страницы, включая кнопку языка, которая стоит вне .scene. */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 button,
@@ -151,6 +153,149 @@ button {
   font-size: 12px;
   font-weight: 450;
   letter-spacing: 0.065em;
+}
+
+/* Кнопка языка: капсула «🌐 RU ⌄», закреплена в правом нижнем углу окна; меню открывается вверх. */
+.lang-menu {
+  position: fixed;
+  z-index: 30;
+  right: 32px;
+  bottom: 32px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.lang-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 11px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--dim);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  transition:
+    background-color 300ms var(--ease),
+    border-color 300ms ease,
+    color 300ms ease;
+}
+
+.lang-button::-webkit-details-marker {
+  display: none;
+}
+
+.lang-button:hover,
+.lang-menu[open] .lang-button {
+  border-color: var(--hover-border);
+  background: var(--button-hover);
+  color: var(--button-text);
+}
+
+.lang-globe {
+  width: 16px;
+  height: 16px;
+}
+
+.lang-code {
+  min-width: 2ch;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Меню открывается вверх, поэтому стрелка в закрытом виде смотрит вверх. */
+.lang-chevron {
+  flex-basis: 14px;
+  width: 14px;
+  height: 14px;
+  transform: rotate(180deg);
+}
+
+.lang-menu[open] .lang-chevron {
+  transform: none;
+}
+
+.lang-list {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  bottom: calc(100% + 10px);
+  display: grid;
+  gap: 3px;
+  min-width: 220px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--menu-border);
+  border-radius: 11px;
+  background: var(--menu-bg);
+  box-shadow: 0 10px 30px var(--menu-shadow);
+  list-style: none;
+  animation: lang-menu-in 200ms var(--ease);
+}
+
+@keyframes lang-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.lang-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--button-text);
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+/* Плавно только наведение. Смена выбранного языка — мгновенно: иначе переход не успевал
+   доиграть, пока меню закрыто, и при следующем открытии на миг подсвечивался прошлый язык. */
+.lang-option:hover {
+  background: var(--button-hover);
+  transition: background-color 200ms ease;
+}
+
+.lang-option:focus-visible {
+  outline-offset: 0;
+}
+
+.lang-option-name {
+  flex: 1 1 auto;
+}
+
+.lang-option-code {
+  color: var(--dim);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+.lang-check {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  color: var(--ink);
+  opacity: 0;
+}
+
+/* Выбранный язык подсвечен так же, как при наведении, только ярче. */
+.lang-option[aria-current='true'] {
+  background: color-mix(in srgb, var(--ink) 11%, transparent);
+  color: var(--ink);
+}
+
+.lang-option[aria-current='true'] .lang-check {
+  opacity: 1;
 }
 
 .hero {
@@ -712,6 +857,8 @@ button {
    не прыгает и при повторном клике просто разворачивается обратно. */
 .event {
   position: relative;
+  display: flex;
+  align-items: center;
   margin-bottom: 8px;
   border: 1px solid var(--card-border);
   border-radius: 11px;
@@ -725,6 +872,19 @@ button {
   margin-bottom: 0;
 }
 
+/* Карточка раскрывается кликом в любом месте. */
+.event {
+  cursor: pointer;
+}
+
+/* Название всегда на одном месте: в раскрытой карточке оно не переносится заново,
+   когда справа выезжают подробности, а обрезается «…» (полное — в подсказке). */
+.event[data-open] .event-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .event:hover,
 .event[data-open] {
   border-color: var(--card-border-open);
@@ -733,10 +893,12 @@ button {
 
 .event-head {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 12px;
-  width: 100%;
   min-width: 0;
+  /* Прижата к верху: если раскрытая карточка станет выше, название не съедет вниз. */
+  align-self: flex-start;
   padding: 20px;
   border: 0;
   border-radius: 10px;
@@ -753,18 +915,46 @@ button {
 .event-color {
   display: inline-block;
   flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
+  background: var(--calendar);
 }
 
 .event-timing {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Капсула календаря: фон и рамка — оттенки цвета календаря. */
+.event-calendar {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  height: 22px;
+  padding: 0 9px 0 8px;
+  border: 1px solid color-mix(in srgb, var(--calendar) 34%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--calendar) 14%, transparent);
+  color: var(--ink);
+  font-size: 11.5px;
+  line-height: 1;
+}
+
+.event-calendar-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .event-time {
+  flex: none;
+  white-space: nowrap;
   color: var(--event-time);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -799,36 +989,94 @@ button {
     color 250ms ease;
 }
 
-.event:hover .disclosure-chevron,
-.event-head:focus-visible .disclosure-chevron {
+/* Стрелка справа — отдельный элемент, клик по ней тоже раскрывает карточку. */
+.event-toggle {
+  display: grid;
+  flex: none;
+  align-self: stretch;
+  place-items: center;
+  order: 3;
+  padding: 0 14px 0 12px;
+  cursor: pointer;
+}
+
+/* Стрелка «›» без рамки: при наведении становится ярче,
+   при раскрытии плавно, с лёгким перелётом, разворачивается в «‹».
+   Область 36×36 — чтобы по ней было легко попасть. */
+.event-toggle-circle {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--dim);
+  transition:
+    color 250ms ease,
+    transform 250ms var(--ease);
+}
+
+.event:hover .event-toggle-circle,
+.event:has(.event-head:focus-visible) .event-toggle-circle,
+.event[data-open] .event-toggle-circle {
   color: var(--ink);
 }
 
-.event[data-open] .event-expand {
+.event-toggle:active .event-toggle-circle {
+  transform: scale(0.88);
+}
+
+.event-chevron {
+  display: block;
+  width: 17px;
+  height: 17px;
+  transition: transform 560ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.event[data-open] .event-chevron {
   transform: rotate(180deg);
+}
+
+/* Подробности выезжают справа налево в ту же строку, что и название.
+   Ширина и высота растут через fr (0fr → 1fr), содержимое прижато к правому краю,
+   поэтому кажется, что панель выдвигается из-под стрелки. */
+/* Мягкое выдвижение «ящика»: быстро трогается и долго, плавно доезжает. */
+.event {
+  --drawer-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --drawer-close: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 .event-panel {
   display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 340ms var(--ease);
+  /* Панель не сжимается (иначе обрезался бы её левый край с линией) — уступает название. */
+  flex: none;
+  /* По центру высоты карточки. Если подробности выше строки с названием (листок с датами),
+     карточка растёт по ним, и сверху у них те же 20px, что и у названия. */
+  align-self: center;
+  order: 2;
+  min-width: 0;
+  grid-template: 0fr / 0fr;
+  /* Закрытие: ровное ease-in-out — панель мягко трогается и мягко задвигается до конца. */
+  transition: grid-template 600ms var(--drawer-close);
 }
 
 .event[data-open] .event-panel {
-  grid-template-rows: 1fr;
+  grid-template: 1fr / 1fr;
+  transition: grid-template 520ms var(--drawer-ease);
 }
 
 .event-panel-inner {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
   /* Закрытая панель скрыта и от клавиатуры; видимость меняется в конце закрытия. */
   visibility: hidden;
   opacity: 0;
-  transform: translateY(-4px);
+  transform: translateX(32px);
   transition:
-    opacity 200ms ease,
-    transform 340ms var(--ease),
-    visibility 0s linear 340ms;
+    opacity 360ms ease-in-out,
+    transform 600ms var(--drawer-close),
+    visibility 0s linear 600ms;
 }
 
 .event[data-open] .event-panel-inner {
@@ -836,15 +1084,210 @@ button {
   opacity: 1;
   transform: none;
   transition:
-    opacity 260ms ease 60ms,
-    transform 340ms var(--ease),
+    opacity 340ms ease 60ms,
+    transform 520ms var(--drawer-ease),
     visibility 0s;
 }
 
+/* Подробности: листок с датой, время и поля. Блок целиком прижат к правому краю (к стрелке),
+   а строки внутри начинаются от одной линии слева — сразу после разделителя.
+   Ширина — по содержимому, но не шире 560px; при переносе на две строки agenda.js подгоняет её
+   под самую длинную строку. */
 .event-body {
-  margin: 0 20px;
-  padding: 14px 0 18px;
-  border-top: 1px solid var(--line);
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 28px;
+  width: max-content;
+  max-width: min(560px, 60vw);
+  /* 18 + 2 = 20px сверху — ровно как отступ у строки с названием. */
+  margin: 18px 0;
+  padding: 2px 6px 2px 26px;
+  border-left: 1px solid var(--line);
+}
+
+/* «Когда»: листок календаря с датой + крупное время. */
+.event-when {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.event-when-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Узкое окно: места справа нет — подробности раскрываются под названием, как раньше. */
+@media (max-width: 760px) {
+  .event {
+    flex-wrap: wrap;
+  }
+
+  .event-head {
+    flex-basis: calc(100% - 64px);
+  }
+
+  /* Стрелка остаётся в строке с названием, подробности — ниже, поэтому она смотрит вниз. */
+  .event-toggle {
+    order: 1;
+  }
+
+  .event-chevron {
+    transform: rotate(90deg);
+  }
+
+  .event[data-open] .event-chevron {
+    transform: rotate(-90deg);
+  }
+
+  .event-panel {
+    flex-basis: 100%;
+    grid-template: 0fr / 1fr;
+  }
+
+  .event[data-open] .event-panel {
+    grid-template: 1fr / 1fr;
+  }
+
+  .event-panel-inner {
+    justify-content: flex-start;
+    transform: translateY(-4px);
+  }
+
+  .event-body {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: none;
+    margin: 0 20px;
+    padding: 16px 0 18px;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+}
+
+.event-when-tile {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: 44px;
+  height: 48px;
+  overflow: hidden;
+  border: 1px solid var(--card-border-open);
+  border-radius: 10px;
+  background: var(--surface-hover);
+  text-align: center;
+}
+
+.event-when-tile-range {
+  width: auto;
+  height: auto;
+  white-space: nowrap;
+}
+
+.event-when-tile-range .event-when-month {
+  padding-inline: 10px;
+}
+
+/* Листок со временем: сверху длительность — обычными буквами, а не капсом, как у месяца. */
+.event-when-tile-time .event-when-month {
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.event-when-tile-time .event-when-span {
+  padding-block: 6px 7px;
+}
+
+.event-when-month-sep {
+  display: inline-block;
+  width: 3px;
+  height: 1px;
+  margin: 0 2px 0 1px;
+  background: currentColor;
+  vertical-align: middle;
+}
+
+/* Несколько дней: «25 – 27», под числами день недели и время. */
+.event-when-span {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 7px 10px 8px;
+}
+
+.event-when-point {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.event-when-point .event-when-day {
+  display: block;
+  flex: none;
+}
+
+/* Короткое тире между числами. */
+.event-when-sep {
+  flex: none;
+  width: 6px;
+  height: 1.5px;
+  margin-top: 8.5px;
+  border-radius: 1px;
+  background: var(--dim);
+}
+
+.event-when-caption {
+  color: var(--dim);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.event-when-caption-time {
+  color: var(--field-value);
+  font-variant-numeric: tabular-nums;
+}
+
+.event-when-month {
+  padding: 3px 0 2px;
+  background: color-mix(in srgb, var(--calendar) 22%, transparent);
+  color: color-mix(in srgb, var(--calendar) 60%, var(--ink));
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.event-when-day {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  color: var(--ink);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Время и длительность — в одном масштабе с полями «Место», «Повтор»: без лишнего акцента. */
+.event-when-main {
+  color: var(--field-value);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+.event-when-sub {
+  color: var(--dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
 }
 
 .event-fields {
@@ -1160,6 +1603,10 @@ button {
   *::before,
   *::after {
     transition: none !important;
+  }
+
+  .lang-list {
+    animation: none;
   }
 
   .bookmark:is(:hover, :focus-visible),

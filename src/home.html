@@ -11,7 +11,7 @@
     <script type="module" src="js/home.js"></script>
   </head>
   <body>
-    <main class="scene" aria-label="Стартовая страница">
+    <main class="scene" data-i18n-label="pageLabel">
       <div class="scene-inner">
         <div class="identity">mrkvqv</div>
         <div class="hero">
@@ -20,48 +20,35 @@
         </div>
 
         <div class="layout">
-          <nav class="bookmarks" data-bookmarks aria-label="Закреплённые вкладки Zen"></nav>
+          <nav class="bookmarks" data-bookmarks data-i18n-label="pinsLabel"></nav>
 
-          <section class="calendar" aria-label="Календарь">
+          <section class="calendar" data-i18n-label="calendarLabel">
             <header class="month-heading">
               <h3 class="month-label" data-month-label aria-live="polite" aria-atomic="true"></h3>
               <div class="month-controls">
-                <button
-                  class="nav-button"
-                  type="button"
-                  data-step-month="-1"
-                  aria-label="Предыдущий месяц"
-                  title="Предыдущий месяц"
-                ></button>
-                <button class="nav-button" type="button" data-step-month="1" aria-label="Следующий месяц" title="Следующий месяц"></button>
+                <button class="nav-button" type="button" data-step-month="-1" data-i18n-label="prevMonth" title=""></button>
+                <button class="nav-button" type="button" data-step-month="1" data-i18n-label="nextMonth" title=""></button>
               </div>
             </header>
             <table class="month-grid">
               <thead>
-                <tr>
-                  <th scope="col" aria-label="Понедельник">пн</th>
-                  <th scope="col" aria-label="Вторник">вт</th>
-                  <th scope="col" aria-label="Среда">ср</th>
-                  <th scope="col" aria-label="Четверг">чт</th>
-                  <th scope="col" aria-label="Пятница">пт</th>
-                  <th scope="col" aria-label="Суббота">сб</th>
-                  <th scope="col" aria-label="Воскресенье">вс</th>
-                </tr>
+                <!-- Дни недели подписывает calendar.js на выбранном языке. -->
+                <tr data-weekdays></tr>
               </thead>
               <tbody data-days></tbody>
             </table>
             <div class="selection">
-              <button class="nav-button" type="button" data-step-day="-1" aria-label="Предыдущий день" title="Предыдущий день"></button>
+              <button class="nav-button" type="button" data-step-day="-1" data-i18n-label="prevDay" title=""></button>
               <time class="selected-date" data-selected-date aria-live="polite" aria-atomic="true"></time>
-              <button class="nav-button" type="button" data-step-day="1" aria-label="Следующий день" title="Следующий день"></button>
+              <button class="nav-button" type="button" data-step-day="1" data-i18n-label="nextDay" title=""></button>
             </div>
             <div class="reset-row">
-              <button class="reset" type="button" data-today>Сегодня</button>
+              <button class="reset" type="button" data-today data-i18n="today"></button>
             </div>
           </section>
         </div>
 
-        <section class="agenda" data-agenda aria-label="События календаря">
+        <section class="agenda" data-agenda data-i18n-label="agendaLabel">
           <header class="agenda-header">
             <div class="agenda-title-row">
               <h2 class="agenda-heading" data-agenda-heading></h2>
@@ -70,7 +57,7 @@
             <div class="sync-controls">
               <span class="sync-status" data-sync-status role="status"></span>
               <details class="calendar-list" data-calendar-list></details>
-              <button class="refresh-events" type="button" data-refresh-events>Обновить</button>
+              <button class="refresh-events" type="button" data-refresh-events data-i18n="refresh"></button>
             </div>
           </header>
           <div class="event-list-frame" data-event-frame>
@@ -80,12 +67,12 @@
       </div>
     </main>
 
+    <!-- Кнопка языка в правом нижнем углу окна (собирает language-menu.js). -->
+    <details class="lang-menu" data-lang-menu></details>
+
     <template data-setup>
       <form class="setup" data-setup-form>
-        <p class="setup-text">
-          Чтобы показать Essentials и события, расширению нужен ключ локального моста календаря. Скопируй его командой
-          <code>pnpm bridge-key</code> в папке проекта и вставь сюда.
-        </p>
+        <p class="setup-text"><span data-i18n="setupBefore"></span> <code>pnpm bridge-key</code> <span data-i18n="setupAfter"></span></p>
         <div class="setup-row">
           <input
             class="setup-input"
@@ -93,12 +80,12 @@
             type="password"
             autocomplete="off"
             spellcheck="false"
-            placeholder="Ключ моста"
-            aria-label="Ключ моста"
+            data-i18n-placeholder="bridgeKey"
+            data-i18n-label="bridgeKey"
             required
             minlength="32"
           />
-          <button class="refresh-events" type="submit">Сохранить</button>
+          <button class="refresh-events" type="submit" data-i18n="save"></button>
         </div>
       </form>
     </template>
